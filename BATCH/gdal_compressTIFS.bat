@@ -1,7 +1,16 @@
 @echo off
 rem "compressTIFS.bat"
-rem >> compressTIFS directory_input [directory_output] [-r]
+rem >> compressTIFS.bat directory_input [directory_output] [-r]
+
 rem Loop over folder with .tifs and compress files either in place (default) or to a new folder (keeping the folder structure, if recursing)
+
+rem USAGE examples:
+rem 1) Default
+rem 	compressTIFS.bat C:\data 
+rem 2) In place with recursion to subdirs
+rem 	compressTIFS.bat C:\data "" -r
+rem 3) To output dir with recursion to subdirs
+rem 	compressTIFS.bat C:\data C:\data_compressed -r
 
 rem DEPENDENCIES:
 rem 1) GDAL - the command GDAL_TRANSLATE must be found on PATH
@@ -20,21 +29,25 @@ if "%~1" == "" goto errorInput
 if not exist "%1" goto errorDir
 
 set inplace=false
-if "%~2" == "" (
-    echo Output dir not specified... compressing in place using temp files
-    set inplace=true
+set recurse=false
+if "%~2" == "-r" (
+    set recurse=true
 ) else (
-    echo Output directory: "%~2"
-    if not exist "%~2" (
-        mkdir "%~2"
-        echo Output dir doesn't exist ... created.
+    if "%~2" == "" (
+        echo Output dir not specified... compressing in place using temp files
+        set inplace=true
+    ) else (
+        echo Output directory: "%~2"
+        if not exist "%~2" (
+            mkdir "%~2"
+            echo Output dir doesn't exist ... created.
+        )
     )
 )
 
-set recurse=false
 if "%~3" == "-r" (
-	echo Recursive processing is enabled
-	set recurse=true
+    echo Recursive processing is enabled
+    set recurse=true
 )
 
 echo -------------------------
@@ -48,17 +61,20 @@ if %recurse%==true (
 	setlocal enableDelayedExpansion
 	set "file=%%i"
 	if "!file:~-4!" == ".tif" (
-	  set "folder=!file:%~1=!"
+	  rem get relative path and filename without extension .tif
+	  set "rel_fname=!file:%~1=!"
+	  set "rel_fname=!rel_fname:~0,-4!"
+	  rem get filename without extension
 	  set "fname=%%~ni"
 	  set "outdir=%~2!folder!"
 	  if not exist "!outdir!" mkdir "!outdir!"
 	  echo Processing %%i
 	  if %inplace%==true (
-		%gdal_cmd% "%%i" "%%i_temp.tif"
+		%gdal_cmd% "%%i" "%1!rel_fname!_temp.tif"
 		echo Deleting temp file and renaming.
-		echo del "%%i"
-		echo ren "%%i_temp.tif" "%%i"
-		ren "%%i_temp.tif" "%%i"
+		del "%%i"
+		echo ren "%1!rel_fname!_temp.tif" "!fname!.tif"
+		ren	"%1!rel_fname!_temp.tif" "!fname!.tif"
 	  ) else (
 		if exist "!outdir!\!fname!.tif" (
 		  echo WARNING Output file "!outdir!\!fname!.tif" already exists... skipping.
